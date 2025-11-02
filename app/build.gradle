@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.example.encryptpadapp'
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName '0.1'
+    }
+
+    buildFeatures {
+        compose true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.6.0'
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    namespace 'com.example.encryptpadapp'
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.activity:activity-compose:1.8.0'
+    implementation 'androidx.compose.ui:ui:1.6.0'
+    implementation 'androidx.compose.material:material:1.6.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // Argon2 KDF (argon2-jvm)
+    implementation 'de.mkammerer:argon2-jvm:2.11'
+
+    // JSON metadata helper
+    implementation 'org.json:json:20230227'
+}
