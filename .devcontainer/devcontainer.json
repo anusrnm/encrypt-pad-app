@@ -1,16 +1,23 @@
 {
-  "name": "encrypt-pad-app Codespace",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
-  "postCreateCommand": "./gradlew assembleDebug || true",
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "vscjava.vscode-java-pack",
-        "redhat.vscode-yaml"
-      ]
-    }
-  }
+    "name": "Android Development",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+              "settings": {
+                  "java.jdt.ls.java.home": "/usr/lib/jvm/msopenjdk-current",
+                  "editor.formatOnSave": true
+              },
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "ms-azuretools.vscode-docker",
+                "redhat.java",
+                "vscjava.vscode-java-pack"
+            ]
+        }
+    },
+
+    "remoteUser": "vscode"
 }
