@@ -25,12 +25,15 @@ fun DocumentScreen(
     val content by viewModel.content.collectAsState()
     val fileName by viewModel.fileName.collectAsState()
     val isEncrypted by viewModel.isEncrypted.collectAsState()
+    val password by viewModel.password.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val saveSuccess by viewModel.saveSuccess.collectAsState()
+    val isDirty by viewModel.isDirty.collectAsState()
 
     var showPasswordDialog by remember { mutableStateOf(false) }
     var passwordDialogMode by remember { mutableStateOf(PasswordDialogMode.ENCRYPT) }
+    var showUnsavedChangesDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(documentId) {
         if (documentId != null) {
@@ -51,14 +54,20 @@ fun DocumentScreen(
             TopAppBar(
                 title = { Text(fileName.ifEmpty { "New Document" }) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        if (isDirty) {
+                            showUnsavedChangesDialog = true
+                        } else {
+                            onNavigateBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     IconButton(
                         onClick = {
-                            passwordDialogMode = if (isEncrypted) {
+                            passwordDialogMode = if (password != null) {
                                 PasswordDialogMode.CHANGE_ENCRYPTION
                             } else {
                                 PasswordDialogMode.ENCRYPT
@@ -67,14 +76,14 @@ fun DocumentScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = if (isEncrypted) Icons.Filled.Lock else Icons.Outlined.Lock,
-                            contentDescription = if (isEncrypted) "Encrypted" else "Not Encrypted",
-                            tint = if (isEncrypted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = if (password != null) Icons.Filled.Lock else Icons.Outlined.Lock,
+                            contentDescription = if (password != null) "Password Protected" else "No Password",
+                            tint = if (password != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
                         onClick = {
-                            if (isEncrypted) {
+                            if (isEncrypted && password == null) {
                                 passwordDialogMode = PasswordDialogMode.SAVE
                                 showPasswordDialog = true
                             } else {
@@ -116,8 +125,10 @@ fun DocumentScreen(
                             style = MaterialTheme.typography.bodyLarge
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = onNavigateBack) {
-                            Text("Go Back")
+                        Button(onClick = { 
+                            viewModel.clearError()
+                        }) {
+                            Text("OK")
                         }
                     }
                 }
@@ -195,10 +206,33 @@ fun DocumentScreen(
                         viewModel.saveDocument(password)
                     }
                     PasswordDialogMode.CHANGE_ENCRYPTION -> {
-                        viewModel.setEncryption(!isEncrypted, password)
+                        viewModel.setEncryption(password != null, password)
                     }
                 }
                 showPasswordDialog = false
+            }
+        )
+    }
+
+    if (showUnsavedChangesDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnsavedChangesDialog = false },
+            title = { Text("Unsaved Changes") },
+            text = { Text("You have unsaved changes. Do you want to discard them?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUnsavedChangesDialog = false
+                        onNavigateBack()
+                    }
+                ) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnsavedChangesDialog = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }

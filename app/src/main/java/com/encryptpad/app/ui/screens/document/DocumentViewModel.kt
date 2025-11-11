@@ -22,6 +22,7 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
     val isEncrypted: StateFlow<Boolean> = _isEncrypted.asStateFlow()
 
     private val _password = MutableStateFlow<String?>(null)
+    val password: StateFlow<String?> = _password.asStateFlow()
 
     private val _documentId = MutableStateFlow<String?>(null)
 
@@ -34,12 +35,26 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
     private val _saveSuccess = MutableStateFlow(false)
     val saveSuccess: StateFlow<Boolean> = _saveSuccess.asStateFlow()
 
+    // Track original state to detect changes
+    private val _originalContent = MutableStateFlow("")
+    private val _originalFileName = MutableStateFlow("")
+    
+    private val _isDirty = MutableStateFlow(false)
+    val isDirty: StateFlow<Boolean> = _isDirty.asStateFlow()
+
+    private fun updateDirtyState() {
+        _isDirty.value = _content.value != _originalContent.value || 
+                         _fileName.value != _originalFileName.value
+    }
+
     fun updateContent(newContent: String) {
         _content.value = newContent
+        updateDirtyState()
     }
 
     fun updateFileName(newFileName: String) {
         _fileName.value = newFileName
+        updateDirtyState()
     }
 
     fun setEncryption(encrypted: Boolean, password: String?) {
@@ -59,6 +74,11 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
                     _fileName.value = document.name
                     _isEncrypted.value = document.isEncrypted
                     _password.value = password
+                    
+                    // Set original values for dirty tracking
+                    _originalContent.value = document.content
+                    _originalFileName.value = document.name
+                    _isDirty.value = false
                 }
                 .onFailure { e ->
                     _error.value = e.message ?: "Failed to load document"
@@ -91,6 +111,11 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
                 .onSuccess { document ->
                     _documentId.value = document.id
                     _saveSuccess.value = true
+                    
+                    // Update original values after successful save
+                    _originalContent.value = _content.value
+                    _originalFileName.value = _fileName.value
+                    _isDirty.value = false
                 }
                 .onFailure { e ->
                     _error.value = e.message ?: "Failed to save document"
@@ -98,5 +123,9 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
 
             _isLoading.value = false
         }
+    }
+    
+    fun clearError() {
+        _error.value = null
     }
 }

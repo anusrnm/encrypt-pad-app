@@ -7,11 +7,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Date
-import java.util.UUID
 
 class DocumentRepository(private val context: Context) {
     private val encryptionManager = EncryptionManager()
     private val documentsDir = File(context.filesDir, "documents").apply { mkdirs() }
+
+    private fun sanitizeFilename(name: String): String {
+        return name.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+    }
+
+    private fun generateUniqueFilename(baseName: String): String {
+        val sanitized = sanitizeFilename(baseName)
+        var filename = "$sanitized.enc"
+        var counter = 1
+        
+        while (File(documentsDir, filename).exists()) {
+            filename = "${sanitized}_$counter.enc"
+            counter++
+        }
+        
+        return filename
+    }
 
     suspend fun saveDocument(
         name: String,
@@ -21,19 +37,20 @@ class DocumentRepository(private val context: Context) {
         documentId: String? = null
     ): Result<EncryptedDocument> = withContext(Dispatchers.IO) {
         try {
-            val id = documentId ?: UUID.randomUUID().toString()
-            val file = File(documentsDir, "$id.txt")
+            val filename = documentId ?: generateUniqueFilename(name)
+            val file = File(documentsDir, filename)
 
-            val contentToSave = if (isEncrypted && password != null) {
+            // Save content directly (encrypted or plain)
+            val dataToSave = if (isEncrypted && password != null) {
                 encryptionManager.encrypt(content, password)
             } else {
                 content
             }
 
-            file.writeText(contentToSave)
+            file.writeText(dataToSave)
 
             val document = EncryptedDocument(
-                id = id,
+                id = filename,
                 name = name,
                 content = content,
                 isEncrypted = isEncrypted,
@@ -52,14 +69,14 @@ class DocumentRepository(private val context: Context) {
         password: String? = null
     ): Result<EncryptedDocument> = withContext(Dispatchers.IO) {
         try {
-            val file = File(documentsDir, "$documentId.txt")
+            val file = File(documentsDir, documentId)
             if (!file.exists()) {
                 return@withContext Result.failure(Exception("Document not found"))
             }
 
             val fileContent = file.readText()
-            val isEncrypted = password != null
-
+            
+            // Decrypt if password provided
             val content = if (password != null) {
                 try {
                     encryptionManager.decrypt(fileContent, password)
@@ -70,11 +87,14 @@ class DocumentRepository(private val context: Context) {
                 fileContent
             }
 
+            // Extract document name from filename
+            val documentName = file.nameWithoutExtension.replace("_", " ")
+
             val document = EncryptedDocument(
                 id = documentId,
-                name = file.nameWithoutExtension,
+                name = documentName,
                 content = content,
-                isEncrypted = isEncrypted,
+                isEncrypted = password != null,
                 lastModified = Date(file.lastModified()),
                 filePath = file.absolutePath
             )
@@ -88,15 +108,22 @@ class DocumentRepository(private val context: Context) {
     suspend fun listDocuments(): Result<List<EncryptedDocument>> = withContext(Dispatchers.IO) {
         try {
             val documents = documentsDir.listFiles()?.mapNotNull { file ->
-                if (file.extension == "txt") {
-                    EncryptedDocument(
-                        id = file.nameWithoutExtension,
-                        name = file.nameWithoutExtension,
-                        content = "",
-                        isEncrypted = false,
-                        lastModified = Date(file.lastModified()),
-                        filePath = file.absolutePath
-                    )
+                if (file.extension == "enc") {
+                    try {
+                        // Extract name from filename
+                        val documentName = file.nameWithoutExtension.replace("_", " ")
+                        
+                        EncryptedDocument(
+                            id = file.name,
+                            name = documentName,
+                            content = "",
+                            isEncrypted = false, // Unknown until opened
+                            lastModified = Date(file.lastModified()),
+                            filePath = file.absolutePath
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
                 } else null
             } ?: emptyList()
 
@@ -108,7 +135,7 @@ class DocumentRepository(private val context: Context) {
 
     suspend fun deleteDocument(documentId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val file = File(documentsDir, "$documentId.txt")
+            val file = File(documentsDir, documentId)
             if (file.exists()) {
                 file.delete()
             }
