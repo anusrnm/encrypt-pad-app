@@ -93,6 +93,52 @@ gradlew.bat assembleDebug
 ./gradlew assembleDebug
 ```
 
+### Quick Compilation (without building APK)
+
+For faster error checking without building the full APK:
+
+**Compile Kotlin sources only** (fastest for syntax checking):
+```cmd
+# Windows
+gradlew.bat compileDebugKotlin
+
+# Linux/Mac
+./gradlew compileDebugKotlin
+```
+
+**Compile all sources** (includes Java/Kotlin):
+```cmd
+# Windows
+gradlew.bat compileDebugSources
+
+# Linux/Mac
+./gradlew compileDebugSources
+```
+
+**Run lint checks**:
+```cmd
+# Windows
+gradlew.bat lintDebug
+
+# Linux/Mac
+./gradlew lintDebug
+```
+
+**Build without assembling APK**:
+```cmd
+# Windows
+gradlew.bat build -x assembleDebug
+
+# Linux/Mac
+./gradlew build -x assembleDebug
+```
+
+**Clean output** (for better readability):
+```cmd
+# Add --console=plain flag to any command
+gradlew.bat compileDebugKotlin --console=plain
+```
+
 ## Usage
 
 1. **Create New Document**: Tap the + button on the home screen

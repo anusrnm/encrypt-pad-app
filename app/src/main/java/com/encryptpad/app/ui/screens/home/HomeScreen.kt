@@ -124,21 +124,20 @@ fun SwipeToDeleteItem(
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val dismissState = rememberDismissState(
+    val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
-            if (it == DismissValue.DismissedToStart) {
+            if (it == SwipeToDismissBoxValue.EndToStart) {
                 showDeleteDialog = true
             }
             false
         }
     )
 
-    SwipeToDismiss(
+    SwipeToDismissBox(
         state = dismissState,
-        directions = setOf(DismissDirection.EndToStart),
-        background = {
+        backgroundContent = {
             val color = when (dismissState.dismissDirection) {
-                DismissDirection.EndToStart -> MaterialTheme.colorScheme.error
+                SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
                 else -> Color.Transparent
             }
 
@@ -149,7 +148,7 @@ fun SwipeToDeleteItem(
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                if (dismissState.dismissDirection == DismissDirection.EndToStart) {
+                if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
                         contentDescription = "Delete",
@@ -159,13 +158,14 @@ fun SwipeToDeleteItem(
                 }
             }
         },
-        dismissContent = {
-            DocumentListItem(
-                document = document,
-                onClick = onClick
-            )
-        }
-    )
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true
+    ) {
+        DocumentListItem(
+            document = document,
+            onClick = onClick
+        )
+    }
 
     if (showDeleteDialog) {
         AlertDialog(
