@@ -8,7 +8,7 @@ import com.encryptpad.app.ui.screens.document.DocumentViewModel
 import com.encryptpad.app.ui.screens.home.HomeViewModel
 import com.encryptpad.app.ui.screens.settings.SettingsViewModel
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.module.dsl.viewModel
+import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
@@ -20,6 +20,6 @@ val appModule = module {
     
     // ViewModels
     viewModel { HomeViewModel(get(), get()) }
-    viewModel { params -> DocumentViewModel(params.get(), get(), get()) }
+    viewModel { parametersHolder -> DocumentViewModel(parametersHolder.getOrNull(), get(), get()) }
     viewModel { SettingsViewModel(get(), get()) }
 }
