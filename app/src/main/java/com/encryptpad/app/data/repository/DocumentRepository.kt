@@ -8,8 +8,10 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Date
 
-class DocumentRepository(private val context: Context) {
-    private val encryptionManager = EncryptionManager()
+class DocumentRepository(
+    private val context: Context,
+    private val encryptionManager: EncryptionManager
+) {
     private val documentsDir = File(context.filesDir, "documents").apply { mkdirs() }
 
     private fun sanitizeFilename(name: String): String {
@@ -34,7 +36,8 @@ class DocumentRepository(private val context: Context) {
         content: String,
         isEncrypted: Boolean,
         password: String? = null,
-        documentId: String? = null
+        documentId: String? = null,
+        useBiometric: Boolean = false
     ): Result<EncryptedDocument> = withContext(Dispatchers.IO) {
         try {
             val filename = documentId ?: generateUniqueFilename(name)
@@ -48,13 +51,26 @@ class DocumentRepository(private val context: Context) {
             }
 
             file.writeText(dataToSave)
+            
+            // Save metadata
+            val metaFile = File(documentsDir, "$filename.meta")
+            val now = System.currentTimeMillis()
+            val createdAt = if (metaFile.exists()) {
+                metaFile.readLines().firstOrNull()?.toLongOrNull() ?: now
+            } else {
+                now
+            }
+            metaFile.writeText("$createdAt\n$now\n$useBiometric")
 
             val document = EncryptedDocument(
                 id = filename,
-                name = name,
+                title = name,
                 content = content,
                 isEncrypted = isEncrypted,
-                lastModified = Date(),
+                lastModified = Date(now),
+                createdAt = createdAt,
+                lastModifiedTimestamp = now,
+                useBiometric = useBiometric,
                 filePath = file.absolutePath
             )
 
@@ -87,15 +103,31 @@ class DocumentRepository(private val context: Context) {
                 fileContent
             }
 
+            // Read metadata
+            val metaFile = File(documentsDir, "$documentId.meta")
+            val (createdAt, lastModified, useBiometric) = if (metaFile.exists()) {
+                val lines = metaFile.readLines()
+                Triple(
+                    lines.getOrNull(0)?.toLongOrNull() ?: file.lastModified(),
+                    lines.getOrNull(1)?.toLongOrNull() ?: file.lastModified(),
+                    lines.getOrNull(2)?.toBooleanStrictOrNull() ?: false
+                )
+            } else {
+                Triple(file.lastModified(), file.lastModified(), false)
+            }
+
             // Extract document name from filename
             val documentName = file.nameWithoutExtension.replace("_", " ")
 
             val document = EncryptedDocument(
                 id = documentId,
-                name = documentName,
+                title = documentName,
                 content = content,
                 isEncrypted = password != null,
-                lastModified = Date(file.lastModified()),
+                lastModified = Date(lastModified),
+                createdAt = createdAt,
+                lastModifiedTimestamp = lastModified,
+                useBiometric = useBiometric,
                 filePath = file.absolutePath
             )
 
@@ -113,12 +145,28 @@ class DocumentRepository(private val context: Context) {
                         // Extract name from filename
                         val documentName = file.nameWithoutExtension.replace("_", " ")
                         
+                        // Read metadata
+                        val metaFile = File(documentsDir, "${file.name}.meta")
+                        val (createdAt, lastModified, useBiometric) = if (metaFile.exists()) {
+                            val lines = metaFile.readLines()
+                            Triple(
+                                lines.getOrNull(0)?.toLongOrNull() ?: file.lastModified(),
+                                lines.getOrNull(1)?.toLongOrNull() ?: file.lastModified(),
+                                lines.getOrNull(2)?.toBooleanStrictOrNull() ?: false
+                            )
+                        } else {
+                            Triple(file.lastModified(), file.lastModified(), false)
+                        }
+                        
                         EncryptedDocument(
                             id = file.name,
-                            name = documentName,
+                            title = documentName,
                             content = "",
-                            isEncrypted = false, // Unknown until opened
-                            lastModified = Date(file.lastModified()),
+                            isEncrypted = true,
+                            lastModified = Date(lastModified),
+                            createdAt = createdAt,
+                            lastModifiedTimestamp = lastModified,
+                            useBiometric = useBiometric,
                             filePath = file.absolutePath
                         )
                     } catch (e: Exception) {
@@ -132,12 +180,59 @@ class DocumentRepository(private val context: Context) {
             Result.failure(e)
         }
     }
+    
+    suspend fun getAllDocuments(): List<EncryptedDocument> = withContext(Dispatchers.IO) {
+        listDocuments().getOrDefault(emptyList())
+    }
+    
+    suspend fun getRawContent(documentId: String): String = withContext(Dispatchers.IO) {
+        val file = File(documentsDir, documentId)
+        if (file.exists()) file.readText() else ""
+    }
+    
+    suspend fun importDocument(
+        title: String,
+        encryptedContent: String,
+        createdAt: Long,
+        lastModifiedTimestamp: Long,
+        useBiometric: Boolean
+    ): Result<EncryptedDocument> = withContext(Dispatchers.IO) {
+        try {
+            val filename = generateUniqueFilename(title)
+            val file = File(documentsDir, filename)
+            file.writeText(encryptedContent)
+            
+            // Save metadata
+            val metaFile = File(documentsDir, "$filename.meta")
+            metaFile.writeText("$createdAt\n$lastModifiedTimestamp\n$useBiometric")
+            
+            val document = EncryptedDocument(
+                id = filename,
+                title = title,
+                content = "",
+                isEncrypted = true,
+                lastModified = Date(lastModifiedTimestamp),
+                createdAt = createdAt,
+                lastModifiedTimestamp = lastModifiedTimestamp,
+                useBiometric = useBiometric,
+                filePath = file.absolutePath
+            )
+            
+            Result.success(document)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     suspend fun deleteDocument(documentId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val file = File(documentsDir, documentId)
+            val metaFile = File(documentsDir, "$documentId.meta")
             if (file.exists()) {
                 file.delete()
+            }
+            if (metaFile.exists()) {
+                metaFile.delete()
             }
             Result.success(Unit)
         } catch (e: Exception) {

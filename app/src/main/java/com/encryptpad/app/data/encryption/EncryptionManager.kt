@@ -1,5 +1,6 @@
 package com.encryptpad.app.data.encryption
 
+import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.nio.charset.StandardCharsets
@@ -10,7 +11,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class EncryptionManager {
+class EncryptionManager(private val context: Context) {
     private val keyStore: KeyStore = KeyStore.getInstance("AndroidKeyStore").apply {
         load(null)
     }
