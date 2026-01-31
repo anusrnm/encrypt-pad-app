@@ -16,9 +16,7 @@ class DocumentViewModel(
     private val biometricAuthManager: BiometricAuthManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<DocumentUiState>(
-        if (documentId != null) DocumentUiState.PasswordRequired else DocumentUiState.Loading
-    )
+    private val _uiState = MutableStateFlow<DocumentUiState>(DocumentUiState.Loading)
     val uiState: StateFlow<DocumentUiState> = _uiState.asStateFlow()
 
     private val _content = MutableStateFlow("")
@@ -68,6 +66,17 @@ class DocumentViewModel(
                 content = "",
                 isModified = false
             )
+        } else {
+            // Existing document - check if it's encrypted
+            viewModelScope.launch {
+                val isEncrypted = repository.isDocumentEncrypted(documentId)
+                if (isEncrypted) {
+                    _uiState.value = DocumentUiState.PasswordRequired
+                } else {
+                    // Not encrypted - load directly without password
+                    loadDocument(documentId, null)
+                }
+            }
         }
     }
 
