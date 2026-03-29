@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.encryptpad.app.ui.state.DocumentUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,12 +32,14 @@ fun DocumentScreen(
     val saveSuccess by viewModel.saveSuccess.collectAsState()
     val isDirty by viewModel.isDirty.collectAsState()
 
+    val uiState by viewModel.uiState.collectAsState()
+
     var showPasswordDialog by remember { mutableStateOf(false) }
     var passwordDialogMode by remember { mutableStateOf(PasswordDialogMode.ENCRYPT) }
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(documentId) {
-        if (documentId != null) {
+    LaunchedEffect(uiState) {
+        if (uiState is DocumentUiState.PasswordRequired) {
             passwordDialogMode = PasswordDialogMode.DECRYPT
             showPasswordDialog = true
         }
