@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
@@ -284,9 +285,9 @@ fun DocumentListItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Filled.Lock,
-                contentDescription = "Encrypted",
-                tint = MaterialTheme.colorScheme.primary,
+                imageVector = if (document.isEncrypted) Icons.Filled.Lock else Icons.Outlined.LockOpen,
+                contentDescription = if (document.isEncrypted) "Encrypted" else "Not encrypted",
+                tint = if (document.isEncrypted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
             if (document.useBiometric) {
