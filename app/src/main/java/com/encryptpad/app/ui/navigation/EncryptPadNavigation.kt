@@ -1,7 +1,6 @@
 package com.encryptpad.app.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -11,10 +10,14 @@ import com.encryptpad.app.ui.screens.document.DocumentScreen
 import com.encryptpad.app.ui.screens.document.DocumentViewModel
 import com.encryptpad.app.ui.screens.home.HomeScreen
 import com.encryptpad.app.ui.screens.home.HomeViewModel
+import com.encryptpad.app.ui.screens.settings.SettingsScreen
+import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 sealed class Screen(val route: String) {
-    object Home : Screen("home")
-    object Document : Screen("document/{documentId}") {
+    data object Home : Screen("home")
+    data object Settings : Screen("settings")
+    data object Document : Screen("document/{documentId}") {
         fun createRoute(documentId: String?) = "document/${documentId ?: "new"}"
     }
 }
@@ -25,7 +28,7 @@ fun EncryptPadNavigation() {
 
     NavHost(navController = navController, startDestination = Screen.Home.route) {
         composable(Screen.Home.route) {
-            val viewModel: HomeViewModel = viewModel()
+            val viewModel: HomeViewModel = koinViewModel()
             HomeScreen(
                 viewModel = viewModel,
                 onDocumentClick = { documentId ->
@@ -33,7 +36,16 @@ fun EncryptPadNavigation() {
                 },
                 onNewDocument = {
                     navController.navigate(Screen.Document.createRoute(null))
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
+            )
+        }
+        
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
@@ -42,10 +54,11 @@ fun EncryptPadNavigation() {
             arguments = listOf(navArgument("documentId") { type = NavType.StringType })
         ) { backStackEntry ->
             val documentId = backStackEntry.arguments?.getString("documentId")
-            val viewModel: DocumentViewModel = viewModel()
+            val effectiveDocId = if (documentId == "new") null else documentId
+            val viewModel: DocumentViewModel = koinViewModel { parametersOf(effectiveDocId) }
             DocumentScreen(
                 viewModel = viewModel,
-                documentId = if (documentId == "new") null else documentId,
+                documentId = effectiveDocId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

@@ -1,16 +1,23 @@
 package com.encryptpad.app.ui.screens.document
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.encryptpad.app.data.encryption.BiometricAuthManager
 import com.encryptpad.app.data.repository.DocumentRepository
+import com.encryptpad.app.ui.state.DocumentUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class DocumentViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = DocumentRepository(application)
+class DocumentViewModel(
+    private val documentId: String?,
+    private val repository: DocumentRepository,
+    private val biometricAuthManager: BiometricAuthManager
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<DocumentUiState>(DocumentUiState.Loading)
+    val uiState: StateFlow<DocumentUiState> = _uiState.asStateFlow()
 
     private val _content = MutableStateFlow("")
     val content: StateFlow<String> = _content.asStateFlow()
@@ -23,8 +30,11 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
 
     private val _password = MutableStateFlow<String?>(null)
     val password: StateFlow<String?> = _password.asStateFlow()
+    
+    private val _useBiometric = MutableStateFlow(false)
+    val useBiometric: StateFlow<Boolean> = _useBiometric.asStateFlow()
 
-    private val _documentId = MutableStateFlow<String?>(null)
+    private val _currentDocumentId = MutableStateFlow<String?>(documentId)
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -41,6 +51,34 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
     
     private val _isDirty = MutableStateFlow(false)
     val isDirty: StateFlow<Boolean> = _isDirty.asStateFlow()
+    
+    val canUseBiometric: Boolean get() = biometricAuthManager.canAuthenticate()
+
+    init {
+        if (documentId == null) {
+            // New document - go straight to unlocked state
+            _uiState.value = DocumentUiState.Unlocked(
+                document = com.encryptpad.app.data.model.EncryptedDocument.create(
+                    id = "",
+                    title = "",
+                    content = ""
+                ),
+                content = "",
+                isModified = false
+            )
+        } else {
+            // Existing document - check if it's encrypted
+            viewModelScope.launch {
+                val isEncrypted = repository.isDocumentEncrypted(documentId)
+                if (isEncrypted) {
+                    _uiState.value = DocumentUiState.PasswordRequired
+                } else {
+                    // Not encrypted - load directly without password
+                    loadDocument(documentId, null)
+                }
+            }
+        }
+    }
 
     private fun updateDirtyState() {
         _isDirty.value = _content.value != _originalContent.value || 
@@ -57,34 +95,41 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
         updateDirtyState()
     }
 
-    fun setEncryption(encrypted: Boolean, password: String?) {
+    fun setEncryption(encrypted: Boolean, password: String?, useBiometric: Boolean = false) {
         _isEncrypted.value = encrypted
         _password.value = password
+        _useBiometric.value = useBiometric
     }
 
-    fun loadDocument(documentId: String, password: String?) {
+    fun loadDocument(docId: String, password: String?) {
         viewModelScope.launch {
-            _isLoading.value = true
+            _uiState.value = DocumentUiState.Loading
             _error.value = null
 
-            repository.loadDocument(documentId, password)
+            repository.loadDocument(docId, password)
                 .onSuccess { document ->
-                    _documentId.value = document.id
+                    _currentDocumentId.value = document.id
                     _content.value = document.content
-                    _fileName.value = document.name
+                    _fileName.value = document.title
                     _isEncrypted.value = document.isEncrypted
                     _password.value = password
+                    _useBiometric.value = document.useBiometric
                     
                     // Set original values for dirty tracking
                     _originalContent.value = document.content
-                    _originalFileName.value = document.name
+                    _originalFileName.value = document.title
                     _isDirty.value = false
+                    
+                    _uiState.value = DocumentUiState.Unlocked(
+                        document = document,
+                        content = document.content,
+                        isModified = false
+                    )
                 }
                 .onFailure { e ->
                     _error.value = e.message ?: "Failed to load document"
+                    _uiState.value = DocumentUiState.Error(e.message ?: "Failed to load document")
                 }
-
-            _isLoading.value = false
         }
     }
 
@@ -100,16 +145,22 @@ class DocumentViewModel(application: Application) : AndroidViewModel(application
             _saveSuccess.value = false
 
             val effectivePassword = password ?: _password.value
+            val shouldEncrypt = _isEncrypted.value && !effectivePassword.isNullOrEmpty()
 
             repository.saveDocument(
                 name = _fileName.value,
                 content = _content.value,
-                isEncrypted = _isEncrypted.value,
-                password = effectivePassword,
-                documentId = _documentId.value
+                isEncrypted = shouldEncrypt,
+                password = if (shouldEncrypt) effectivePassword else null,
+                documentId = _currentDocumentId.value,
+                useBiometric = _useBiometric.value
             )
                 .onSuccess { document ->
-                    _documentId.value = document.id
+                    _currentDocumentId.value = document.id
+                    _isEncrypted.value = shouldEncrypt
+                    if (!shouldEncrypt) {
+                        _password.value = null
+                    }
                     _saveSuccess.value = true
                     
                     // Update original values after successful save
