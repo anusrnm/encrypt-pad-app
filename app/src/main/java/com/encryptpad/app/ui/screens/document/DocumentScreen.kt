@@ -6,7 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,7 +70,7 @@ fun DocumentScreen(
                 actions = {
                     IconButton(
                         onClick = {
-                            passwordDialogMode = if (password != null) {
+                            passwordDialogMode = if (isEncrypted) {
                                 PasswordDialogMode.CHANGE_ENCRYPTION
                             } else {
                                 PasswordDialogMode.ENCRYPT
@@ -79,9 +79,9 @@ fun DocumentScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = if (password != null) Icons.Filled.Lock else Icons.Outlined.Lock,
-                            contentDescription = if (password != null) "Password Protected" else "No Password",
-                            tint = if (password != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = if (isEncrypted) Icons.Filled.Lock else Icons.Outlined.LockOpen,
+                            contentDescription = if (isEncrypted) "Password Protected" else "No Password",
+                            tint = if (isEncrypted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
