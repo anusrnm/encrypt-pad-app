@@ -6,7 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.encryptpad.app.ui.state.DocumentUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,12 +32,14 @@ fun DocumentScreen(
     val saveSuccess by viewModel.saveSuccess.collectAsState()
     val isDirty by viewModel.isDirty.collectAsState()
 
+    val uiState by viewModel.uiState.collectAsState()
+
     var showPasswordDialog by remember { mutableStateOf(false) }
     var passwordDialogMode by remember { mutableStateOf(PasswordDialogMode.ENCRYPT) }
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(documentId) {
-        if (documentId != null) {
+    LaunchedEffect(uiState) {
+        if (uiState is DocumentUiState.PasswordRequired) {
             passwordDialogMode = PasswordDialogMode.DECRYPT
             showPasswordDialog = true
         }
@@ -67,7 +70,7 @@ fun DocumentScreen(
                 actions = {
                     IconButton(
                         onClick = {
-                            passwordDialogMode = if (password != null) {
+                            passwordDialogMode = if (isEncrypted) {
                                 PasswordDialogMode.CHANGE_ENCRYPTION
                             } else {
                                 PasswordDialogMode.ENCRYPT
@@ -76,9 +79,9 @@ fun DocumentScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = if (password != null) Icons.Filled.Lock else Icons.Outlined.Lock,
-                            contentDescription = if (password != null) "Password Protected" else "No Password",
-                            tint = if (password != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = if (isEncrypted) Icons.Filled.Lock else Icons.Outlined.LockOpen,
+                            contentDescription = if (isEncrypted) "Password Protected" else "No Password",
+                            tint = if (isEncrypted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
