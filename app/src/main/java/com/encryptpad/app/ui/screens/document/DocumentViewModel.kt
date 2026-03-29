@@ -145,17 +145,22 @@ class DocumentViewModel(
             _saveSuccess.value = false
 
             val effectivePassword = password ?: _password.value
+            val shouldEncrypt = _isEncrypted.value && !effectivePassword.isNullOrEmpty()
 
             repository.saveDocument(
                 name = _fileName.value,
                 content = _content.value,
-                isEncrypted = _isEncrypted.value,
-                password = effectivePassword,
+                isEncrypted = shouldEncrypt,
+                password = if (shouldEncrypt) effectivePassword else null,
                 documentId = _currentDocumentId.value,
                 useBiometric = _useBiometric.value
             )
                 .onSuccess { document ->
                     _currentDocumentId.value = document.id
+                    _isEncrypted.value = shouldEncrypt
+                    if (!shouldEncrypt) {
+                        _password.value = null
+                    }
                     _saveSuccess.value = true
                     
                     // Update original values after successful save

@@ -14,6 +14,20 @@ class DocumentRepository(
 ) {
     private val documentsDir = File(context.filesDir, "documents").apply { mkdirs() }
 
+    // Heuristic fallback for legacy metadata that doesn't include an isEncrypted flag.
+    // Encrypted payloads are Base64-encoded bytes (IV + ciphertext), while plaintext is not.
+    private fun inferEncryptionFromContent(fileContent: String): Boolean {
+        val normalized = fileContent.trim()
+        if (normalized.isEmpty()) return false
+
+        return try {
+            val decoded = java.util.Base64.getDecoder().decode(normalized)
+            decoded.size > 12 && java.util.Base64.getEncoder().encodeToString(decoded) == normalized
+        } catch (_: IllegalArgumentException) {
+            false
+        }
+    }
+
     private fun sanitizeFilename(name: String): String {
         return name.replace(Regex("[^a-zA-Z0-9._-]"), "_")
     }
@@ -108,14 +122,20 @@ class DocumentRepository(
             data class DocMeta(val createdAt: Long, val lastModified: Long, val useBiometric: Boolean, val isEncrypted: Boolean)
             val meta = if (metaFile.exists()) {
                 val lines = metaFile.readLines()
+                val inferredIsEncrypted = inferEncryptionFromContent(fileContent)
                 DocMeta(
                     createdAt = lines.getOrNull(0)?.toLongOrNull() ?: file.lastModified(),
                     lastModified = lines.getOrNull(1)?.toLongOrNull() ?: file.lastModified(),
                     useBiometric = lines.getOrNull(2)?.toBooleanStrictOrNull() ?: false,
-                    isEncrypted = lines.getOrNull(3)?.toBooleanStrictOrNull() ?: true
+                    isEncrypted = lines.getOrNull(3)?.toBooleanStrictOrNull() ?: inferredIsEncrypted
                 )
             } else {
-                DocMeta(file.lastModified(), file.lastModified(), false, true)
+                DocMeta(
+                    createdAt = file.lastModified(),
+                    lastModified = file.lastModified(),
+                    useBiometric = false,
+                    isEncrypted = inferEncryptionFromContent(fileContent)
+                )
             }
 
             // Extract document name from filename
@@ -151,14 +171,20 @@ class DocumentRepository(
                         val metaFile = File(documentsDir, "${file.name}.meta")
                         val (createdAt, lastModified, useBiometric, isEncrypted) = if (metaFile.exists()) {
                             val lines = metaFile.readLines()
+                            val inferredIsEncrypted = inferEncryptionFromContent(file.readText())
                             listOf(
                                 lines.getOrNull(0)?.toLongOrNull() ?: file.lastModified(),
                                 lines.getOrNull(1)?.toLongOrNull() ?: file.lastModified(),
                                 lines.getOrNull(2)?.toBooleanStrictOrNull() ?: false,
-                                lines.getOrNull(3)?.toBooleanStrictOrNull() ?: true
+                                lines.getOrNull(3)?.toBooleanStrictOrNull() ?: inferredIsEncrypted
                             )
                         } else {
-                            listOf(file.lastModified(), file.lastModified(), false, true)
+                            listOf(
+                                file.lastModified(),
+                                file.lastModified(),
+                                false,
+                                inferEncryptionFromContent(file.readText())
+                            )
                         }
                         
                         EncryptedDocument(
@@ -198,7 +224,8 @@ class DocumentRepository(
         encryptedContent: String,
         createdAt: Long,
         lastModifiedTimestamp: Long,
-        useBiometric: Boolean
+        useBiometric: Boolean,
+        isEncrypted: Boolean = true
     ): Result<EncryptedDocument> = withContext(Dispatchers.IO) {
         try {
             val filename = generateUniqueFilename(title)
@@ -207,13 +234,13 @@ class DocumentRepository(
             
             // Save metadata
             val metaFile = File(documentsDir, "$filename.meta")
-            metaFile.writeText("$createdAt\n$lastModifiedTimestamp\n$useBiometric")
+            metaFile.writeText("$createdAt\n$lastModifiedTimestamp\n$useBiometric\n$isEncrypted")
             
             val document = EncryptedDocument(
                 id = filename,
                 title = title,
                 content = "",
-                isEncrypted = true,
+                isEncrypted = isEncrypted,
                 lastModified = Date(lastModifiedTimestamp),
                 createdAt = createdAt,
                 lastModifiedTimestamp = lastModifiedTimestamp,
@@ -248,13 +275,17 @@ class DocumentRepository(
      * Returns true if encrypted, false if not encrypted or if document doesn't exist.
      */
     suspend fun isDocumentEncrypted(documentId: String): Boolean = withContext(Dispatchers.IO) {
+        val documentFile = File(documentsDir, documentId)
+        if (!documentFile.exists()) {
+            return@withContext false
+        }
+
         val metaFile = File(documentsDir, "$documentId.meta")
         if (metaFile.exists()) {
             val lines = metaFile.readLines()
-            lines.getOrNull(3)?.toBooleanStrictOrNull() ?: true
+            lines.getOrNull(3)?.toBooleanStrictOrNull() ?: inferEncryptionFromContent(documentFile.readText())
         } else {
-            // Default to true for backwards compatibility with old documents
-            true
+            inferEncryptionFromContent(documentFile.readText())
         }
     }
 }

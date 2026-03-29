@@ -54,5 +54,6 @@ data class BackupDocument(
     val encryptedContent: String,
     val createdAt: Long,
     val lastModifiedTimestamp: Long,
-    val useBiometric: Boolean
+    val useBiometric: Boolean,
+    val isEncrypted: Boolean = true
 )

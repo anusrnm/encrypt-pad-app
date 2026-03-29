@@ -46,7 +46,8 @@ class BackupManager(
                 encryptedContent = rawContent,
                 createdAt = doc.createdAt,
                 lastModifiedTimestamp = doc.lastModifiedTimestamp,
-                useBiometric = doc.useBiometric
+                useBiometric = doc.useBiometric,
+                isEncrypted = doc.isEncrypted
             )
         }
         
@@ -80,7 +81,8 @@ class BackupManager(
                     encryptedContent = backupDoc.encryptedContent,
                     createdAt = backupDoc.createdAt,
                     lastModifiedTimestamp = backupDoc.lastModifiedTimestamp,
-                    useBiometric = backupDoc.useBiometric
+                    useBiometric = backupDoc.useBiometric,
+                    isEncrypted = backupDoc.isEncrypted
                 )
                 importedCount++
             } catch (e: Exception) {
